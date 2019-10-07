@@ -28,8 +28,7 @@ head(taxi)
 ```
 
 ## 2. Cleaning the taxi data
-<p>As you can see above, the <code>taxi</code> dataset contains the times and price of a large number of taxi trips. Importantly we also get to know the location, the longitude and latitude, where the trip was started.</p>
-<p>Cleaning data is a large part of any data scientist's daily work. It may not seem glamorous, but it makes the difference between a successful model and a failure. The <code>taxi</code> dataset needs a bit of polishing before we're ready to use it.</p>
+<p>As we can see above, the <code>taxi</code> dataset contains the times and price of a large number of taxi trips. Importantly we also get to know the location, the longitude and latitude, where the trip was started.</p> The <code>taxi</code> dataset needs a bit of polishing before we're ready to use it.</p>
 
 
 ```{r}
@@ -40,4 +39,69 @@ taxi <- taxi %>%
         rename(long = pickup_longitude, lat = pickup_latitude) %>%
         filter(fare_amount > 0 | tip_amount > 0) %>% 
         mutate(total = log(fare_amount + tip_amount))
+```
+
+## 3. Zooming in on Manhattan
+<p>While the dataset contains taxi trips from all over New York City, the bulk of the trips are to and from Manhattan, so let's focus only on trips initiated there.</p>
+
+```{r}
+# Reducing the data to taxi trips starting in Manhattan
+taxi <- taxi  %>% 
+    filter(between(lat, 40.70, 40.83), 
+           between(long, -74.025, -73.93))
+```
+
+## 4. Where does the journey begin?
+<p>It's time to draw a map! We're going to use the excellent <code>ggmap</code> package together with <code>ggplot2</code> to visualize where in Manhattan people tend to start their taxi journeys.</p>
+
+D. Kahle and H. Wickham. ggmap: Spatial Visualization with ggplot2. The R Journal, 5(1), 144-161. URL http://journal.r-project.org/archive/2013-1/kahle-wickham.pdf
+
+
+```{r message = FALSE}
+# Loading in ggmap and viridis for nice colors
+library(ggmap)
+library(viridis)
+
+# Retrieving a stored map object
+manhattan <- readRDS("dataset/manhattan.rds")
+
+# Drawing a density map with the number of journey start locations
+ggmap(manhattan, darken = 0.5) +
+  scale_fill_viridis(option = 'plasma') +
+   geom_bin2d(data = taxi, aes(long, lat), bins = 60, alpha = 0.6) +
+  labs(x = 'Longitutde', y = 'Latitude', fill = 'Journey')
+```
+
+## 5. Predicting taxi fares using a tree
+<p>The map showed that the journeys are highly concentrated in the business and tourist areas. </p>
+<p>We're now going to use a regression tree to predict the <code>total</code> fare with <code>lat</code> and <code>long</code> being the predictors. The <code>tree</code> algorithm will try to find cutpoints in those predictors that results in the decision tree with the best predictive capability.  </p>
+
+```{r message = FALSE}
+# Loading in the rpart package
+library(tree) 
+
+# Fitting a tree to lat and long
+fitted_tree <- tree(formula = total ~ lat + long,
+                    data = taxi)
+
+# Draw a diagram of the tree structure
+plot(fitted_tree)
+text(fitted_tree)
+```
+
+## 6. It's time. More predictors.
+<p>The tree above looks a bit frugal, it only includes one split: It predicts that trips where <code>lat &lt; 40.7237</code> are more expensive, which makes sense as it is downtown Manhattan. But that's it. It didn't even include <code>long</code> as <code>tree</code> deemed that it didn't improve the predictions. Taxi drivers will need more information than this and any driver paying for your data-driven insights would be disappointed with that.</p>
+<p>Let's start by adding some more predictors related to the <em>time</em> the taxi trip was made.</p>
+
+```{r message = FALSE}
+# Loading in the lubridate package
+library(lubridate)
+
+# Generate the three new time variables
+taxi <- taxi %>% 
+    mutate(hour = hour(pickup_datetime), 
+           wday = wday(pickup_datetime, label = TRUE), 
+           month = month(pickup_datetime, label = TRUE))
+
+head(taxi)
 ```
