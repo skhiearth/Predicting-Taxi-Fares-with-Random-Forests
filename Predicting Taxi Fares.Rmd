@@ -1,0 +1,41 @@
+---
+title: "Predicting Taxi Fares with Random Forests"
+author: "Utkarsh Sharma"
+date: "08/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. 49999 New York taxi trips
+To drive a yellow New York taxi, you have to hold a "medallion" from the city's <em>Taxi and Limousine Commission</em>. Recently, one of those changed hands for over one million dollars, which shows how lucrative the job can be.
+But this is the age of business intelligence and analytics! Even taxi drivers can stand to benefit from some careful investigation of the data, guiding them to maximize their profits. In this project, we will analyze a random sample of 49999 New York journeys made in 2013. We will also use regression trees and random forests to build a model that can predict the locations and times when the biggest fares can be earned.
+Let's start by taking a look at the data!
+
+```R
+# Loading the tidyverse
+library(tidyverse)
+
+# Reading in the taxi data
+taxi <- read_csv('dataset/taxi.csv')
+
+# Taking a look at the first couple of rows in taxi
+head(taxi)
+```
+
+## 2. Cleaning the taxi data
+<p>As you can see above, the <code>taxi</code> dataset contains the times and price of a large number of taxi trips. Importantly we also get to know the location, the longitude and latitude, where the trip was started.</p>
+<p>Cleaning data is a large part of any data scientist's daily work. It may not seem glamorous, but it makes the difference between a successful model and a failure. The <code>taxi</code> dataset needs a bit of polishing before we're ready to use it.</p>
+
+
+```R
+# Renaming the location variables, 
+#dropping any journeys with zero fares and zero tips,
+# and creating the total variable as the log sum of fare and tip
+taxi <- taxi %>% 
+        rename(long = pickup_longitude, lat = pickup_latitude) %>%
+        filter(fare_amount > 0 | tip_amount > 0) %>% 
+        mutate(total = log(fare_amount + tip_amount))
+```
