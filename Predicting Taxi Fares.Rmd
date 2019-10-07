@@ -2,7 +2,9 @@
 title: "Predicting Taxi Fares with Random Forests"
 author: "Utkarsh Sharma"
 date: "08/10/2019"
-output: html_document
+output: 
+  prettydoc::html_pretty:
+    toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -14,7 +16,7 @@ To drive a yellow New York taxi, you have to hold a "medallion" from the city's 
 But this is the age of business intelligence and analytics! Even taxi drivers can stand to benefit from some careful investigation of the data, guiding them to maximize their profits. In this project, we will analyze a random sample of 49999 New York journeys made in 2013. We will also use regression trees and random forests to build a model that can predict the locations and times when the biggest fares can be earned.
 Let's start by taking a look at the data!
 
-```R
+```{r warning = FALSE, message = FALSE}
 # Loading the tidyverse
 library(tidyverse)
 
@@ -30,7 +32,7 @@ head(taxi)
 <p>Cleaning data is a large part of any data scientist's daily work. It may not seem glamorous, but it makes the difference between a successful model and a failure. The <code>taxi</code> dataset needs a bit of polishing before we're ready to use it.</p>
 
 
-```R
+```{r}
 # Renaming the location variables, 
 #dropping any journeys with zero fares and zero tips,
 # and creating the total variable as the log sum of fare and tip
