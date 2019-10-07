@@ -12,8 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## 1. 49999 New York taxi trips
-To drive a yellow New York taxi, you have to hold a "medallion" from the city's <em>Taxi and Limousine Commission</em>. Recently, one of those changed hands for over one million dollars, which shows how lucrative the job can be.
-But this is the age of business intelligence and analytics! Even taxi drivers can stand to benefit from some careful investigation of the data, guiding them to maximize their profits. In this project, we will analyze a random sample of 49999 New York journeys made in 2013. We will also use regression trees and random forests to build a model that can predict the locations and times when the biggest fares can be earned.
+To drive a yellow New York taxi, one has to hold a "medallion" from the city's <em>Taxi and Limousine Commission</em>. Recently, one of those changed hands for over one million dollars, which shows how lucrative the job can be.
+But this is the age of business intelligence and analytics! Even taxi drivers can stand to benefit from some careful investigation of the data, guiding them to maximize their profits. In this project, I am analysing a random sample of 49999 New York journeys made in 2013 and using regression trees and random forests to predict the value of fares and tips, based on location, date and time.
 Let's start by taking a look at the data!
 
 ```{r warning = FALSE, message = FALSE}
@@ -28,12 +28,10 @@ head(taxi)
 ```
 
 ## 2. Cleaning the taxi data
-<p>As we can see above, the <code>taxi</code> dataset contains the times and price of a large number of taxi trips. Importantly we also get to know the location, the longitude and latitude, where the trip was started.</p> The <code>taxi</code> dataset needs a bit of polishing before we're ready to use it.</p>
-
+<p>As we can see above, the <code>taxi</code> dataset contains the times and price of a large number of taxi trips. Importantly we also get to know the location, the longitude and latitude, where the trip was started.</p> 
 
 ```{r}
-# Renaming the location variables, 
-#dropping any journeys with zero fares and zero tips,
+# Renaming the location variables, dropping any journeys with zero fares and zero tips,
 # and creating the total variable as the log sum of fare and tip
 taxi <- taxi %>% 
         rename(long = pickup_longitude, lat = pickup_latitude) %>%
@@ -54,7 +52,7 @@ taxi <- taxi  %>%
 ## 4. Where does the journey begin?
 <p>It's time to draw a map! We're going to use the excellent <code>ggmap</code> package together with <code>ggplot2</code> to visualize where in Manhattan people tend to start their taxi journeys.</p>
 
-D. Kahle and H. Wickham. ggmap: Spatial Visualization with ggplot2. The R Journal, 5(1), 144-161. URL http://journal.r-project.org/archive/2013-1/kahle-wickham.pdf
+GGMAP: D. Kahle and H. Wickham. ggmap: Spatial Visualization with ggplot2. The R Journal, 5(1), 144-161. URL http://journal.r-project.org/archive/2013-1/kahle-wickham.pdf
 
 
 ```{r message = FALSE}
@@ -74,7 +72,7 @@ ggmap(manhattan, darken = 0.5) +
 
 ## 5. Predicting taxi fares using a tree
 <p>The map showed that the journeys are highly concentrated in the business and tourist areas. </p>
-<p>We're now going to use a regression tree to predict the <code>total</code> fare with <code>lat</code> and <code>long</code> being the predictors. The <code>tree</code> algorithm will try to find cutpoints in those predictors that results in the decision tree with the best predictive capability.  </p>
+<p>We're now going to use a regression tree to predict the <code>total</code> fare with <code>lat</code> and <code>long</code> being the predictors. The <code>tree</code> algorithm will try to find cutpoints in those predictors that results in the decision tree with the best predictive capability. </p>
 
 ```{r message = FALSE}
 # Loading in the rpart package
@@ -90,7 +88,7 @@ text(fitted_tree)
 ```
 
 ## 6. It's time. More predictors.
-<p>The tree above looks a bit frugal, it only includes one split: It predicts that trips where <code>lat &lt; 40.7237</code> are more expensive, which makes sense as it is downtown Manhattan. But that's it. It didn't even include <code>long</code> as <code>tree</code> deemed that it didn't improve the predictions. Taxi drivers will need more information than this and any driver paying for your data-driven insights would be disappointed with that.</p>
+<p>The tree above looks a bit frugal, it only includes one split: It predicts that trips where <code>lat &lt; 40.7237</code> are more expensive, which makes sense as it is downtown Manhattan. But that's it. It didn't even include <code>long</code> as <code>tree</code> deemed that it didn't improve the predictions.
 <p>Let's start by adding some more predictors related to the <em>time</em> the taxi trip was made.</p>
 
 ```{r message = FALSE}
@@ -104,4 +102,67 @@ taxi <- taxi %>%
            month = month(pickup_datetime, label = TRUE))
 
 head(taxi)
+```
+
+## 7. One more tree!
+<p>Let's try fitting a new regression tree where we include the new time variables.</p>
+
+```{r message = FALSE}
+# Fitting a tree with total as the outcome and 
+# lat, long, hour, wday, and month as predictors
+fitted_tree <- tree(formula = total ~ lat + long + hour + wday + month,
+                    data = taxi)
+
+# draw a diagram of the tree structure
+plot(fitted_tree)
+text(fitted_tree)
+
+# Summarizing the performance of the tree
+summary(fitted_tree)
+```
+
+## 8. One tree is not enough
+<p>The regression tree has not changed after including the three time variables. This is likely because latitude is still the most promising first variable to split the data on, and after that split, the other variables are not informative enough to be included. A random forest model, where many different trees are fitted to subsets of the data, may well include the other variables in some of the trees that make it up. </p>
+
+```{r message = FALSE}
+# Loading in the randomForest package
+library(randomForest)
+
+# Fitting a random forest
+fitted_forest <- randomForest(formula = total ~ lat + long + hour + wday + month,
+                    data = taxi,
+                    ntree = 80, sampsize = 10000)
+
+# Printing the fitted_forest object
+fitted_forest
+```
+
+## 9. Plotting the predicted fare
+<p>Now, let's take a look at the predictions of <code>fitted_forest</code> projected back onto Manhattan.</p>
+
+```{r message = FALSE}
+# Extracting the prediction from fitted_forest
+taxi$pred_total <- fitted_forest$predicted
+
+# Plotting the predicted mean trip prices from according to the random forest
+ggmap(manhattan, darken = 0.5) +
+   scale_fill_viridis(option = 'plasma') +
+    stat_summary_2d(data = taxi, aes(x = long, y = lat, z = pred_total), bins = 60, alpha = 0.6, fun = mean) +
+    labs(x = 'Longitutde', y = 'Latitude', fill = 'Predicted Mean Trip Prices')
+```
+
+## 10. Plotting the actual fare
+<p>Looking at the map with the predicted fares we see that fares in downtown Manhattan are predicted to be high, while midtown is lower. Let's compare the map with the predicted fares with a new map showing the mean fares according to the data.</p>
+
+```{r}
+# Function that returns the mean *if* there are 10 or more datapoints
+mean_if_enough_data <- function(x) { 
+    ifelse( length(x) >= 20, mean(x), NA) 
+}
+
+# Plotting the mean trip prices from the data
+ggmap(manhattan, darken = 0.5) +
+   scale_fill_viridis(option = 'plasma') +
+    stat_summary_2d(data = taxi, aes(x = long, y = lat, z = total), bins = 60, alpha = 0.6, fun = mean_if_enough_data) +
+    labs(x = 'Longitutde', y = 'Latitude', fill = 'Predicted Mean Trip Prices')
 ```
